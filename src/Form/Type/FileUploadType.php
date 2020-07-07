@@ -83,7 +83,12 @@ class FileUploadType extends AbstractType implements DataMapperInterface
     public function configureOptions(OptionsResolver $resolver): void
     {
         $uploadNew = static function (UploadedFile $file, string $uploadDir, string $fileName) {
-            $file->move($uploadDir, $fileName);
+            $name = str_replace('\\', '/', $fileName);
+            $pos = strrpos($name, '/');
+            $subDir = false === $pos ? '' : substr($name, 0, $pos);
+            $name = false === $pos ? $name : substr($name, $pos + 1);
+
+            $file->move(rtrim($uploadDir, '/\\').\DIRECTORY_SEPARATOR.$subDir, $name);
         };
 
         $uploadDelete = static function (File $file) {
@@ -188,7 +193,6 @@ class FileUploadType extends AbstractType implements DataMapperInterface
                     '[month]' => date('m'),
                     '[name]' => pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME),
                     '[randomhash]' => bin2hex(random_bytes(20)),
-                    // TODO: remove this by the Symfony String slugger
                     '[slug]' => transliterator_transliterate('Any-Latin; Latin-ASCII; [^A-Za-z0-9_] remove; Lower()', pathinfo($file->getClientOriginalName(), PATHINFO_FILENAME)),
                     '[timestamp]' => time(),
                     '[uuid]' => $generateUuid4(),
@@ -219,7 +223,7 @@ class FileUploadType extends AbstractType implements DataMapperInterface
     public function mapDataToForms($currentFiles, $forms): void
     {
         /** @var FormInterface $fileForm */
-        $fileForm = current(iterator_to_array($forms, false));
+        $fileForm = current(iterator_to_array($forms));
         $fileForm->setData($currentFiles);
     }
 
@@ -229,7 +233,7 @@ class FileUploadType extends AbstractType implements DataMapperInterface
     public function mapFormsToData($forms, &$currentFiles): void
     {
         /** @var FormInterface[] $children */
-        $children = iterator_to_array($forms, false);
+        $children = iterator_to_array($forms);
         $uploadedFiles = $children['file']->getData();
 
         /** @var FileUploadState $state */

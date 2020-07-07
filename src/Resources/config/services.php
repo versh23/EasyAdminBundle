@@ -59,6 +59,7 @@ use EasyCorp\Bundle\EasyAdminBundle\Filter\Configurator\TextConfigurator as Text
 use EasyCorp\Bundle\EasyAdminBundle\Form\Extension\CollectionTypeExtension;
 use EasyCorp\Bundle\EasyAdminBundle\Form\Extension\EaCrudFormTypeExtension;
 use EasyCorp\Bundle\EasyAdminBundle\Form\Type\CrudFormType;
+use EasyCorp\Bundle\EasyAdminBundle\Form\Type\FileUploadType;
 use EasyCorp\Bundle\EasyAdminBundle\Form\Type\FiltersFormType;
 use EasyCorp\Bundle\EasyAdminBundle\Inspector\DataCollector;
 use EasyCorp\Bundle\EasyAdminBundle\Intl\IntlFormatter;
@@ -233,6 +234,10 @@ return static function (ContainerConfigurator $container) {
 
         ->set(FiltersFormType::class)
             ->tag('form.type', ['alias' => 'ea_filters'])
+
+        ->set(FileUploadType::class)
+            ->arg(0, '%kernel.project_dir%')
+            ->tag('form.type')
 
         ->set(ChoiceFilterConfigurator::class)
 

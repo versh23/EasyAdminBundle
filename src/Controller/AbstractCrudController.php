@@ -16,7 +16,6 @@ use EasyCorp\Bundle\EasyAdminBundle\Config\KeyValueStore;
 use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
 use EasyCorp\Bundle\EasyAdminBundle\Contracts\Controller\CrudControllerInterface;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\EntityDto;
-use EasyCorp\Bundle\EasyAdminBundle\Dto\FieldDto;
 use EasyCorp\Bundle\EasyAdminBundle\Dto\SearchDto;
 use EasyCorp\Bundle\EasyAdminBundle\Event\AfterCrudActionEvent;
 use EasyCorp\Bundle\EasyAdminBundle\Event\AfterEntityDeletedEvent;
@@ -30,13 +29,13 @@ use EasyCorp\Bundle\EasyAdminBundle\Exception\EntityRemoveException;
 use EasyCorp\Bundle\EasyAdminBundle\Exception\ForbiddenActionException;
 use EasyCorp\Bundle\EasyAdminBundle\Exception\InsufficientEntityPermissionException;
 use EasyCorp\Bundle\EasyAdminBundle\Factory\ActionFactory;
-use EasyCorp\Bundle\EasyAdminBundle\Factory\ControllerFactory;
 use EasyCorp\Bundle\EasyAdminBundle\Factory\EntityFactory;
 use EasyCorp\Bundle\EasyAdminBundle\Factory\FilterFactory;
 use EasyCorp\Bundle\EasyAdminBundle\Factory\FormFactory;
 use EasyCorp\Bundle\EasyAdminBundle\Factory\PaginatorFactory;
-use EasyCorp\Bundle\EasyAdminBundle\Field\AssociationField;
+use EasyCorp\Bundle\EasyAdminBundle\Form\Type\FileUploadType;
 use EasyCorp\Bundle\EasyAdminBundle\Form\Type\FiltersFormType;
+use EasyCorp\Bundle\EasyAdminBundle\Form\Type\Model\FileUploadState;
 use EasyCorp\Bundle\EasyAdminBundle\Orm\EntityRepository;
 use EasyCorp\Bundle\EasyAdminBundle\Orm\EntityUpdater;
 use EasyCorp\Bundle\EasyAdminBundle\Provider\AdminContextProvider;
@@ -91,7 +90,6 @@ abstract class AbstractCrudController extends AbstractController implements Crud
             'event_dispatcher' => '?'.EventDispatcherInterface::class,
             ActionFactory::class => '?'.ActionFactory::class,
             AdminContextProvider::class => '?'.AdminContextProvider::class,
-            ControllerFactory::class => '?'.ControllerFactory::class,
             CrudUrlGenerator::class => '?'.CrudUrlGenerator::class,
             EntityFactory::class => '?'.EntityFactory::class,
             EntityRepository::class => '?'.EntityRepository::class,
@@ -101,6 +99,29 @@ abstract class AbstractCrudController extends AbstractController implements Crud
             FormFactory::class => '?'.FormFactory::class,
             PaginatorFactory::class => '?'.PaginatorFactory::class,
         ]);
+    }
+
+    public function batch(AdminContext $context): Response
+    {
+        $batchForm = $this->get(FormFactory::class)->createBatchActionsForm();
+        $batchForm->handleRequest($context->getRequest());
+
+        if ($batchForm->isSubmitted() && $batchForm->isValid()) {
+            $crudAction = $batchForm->get('crudAction')->getData();
+            $entityIds = $batchForm->get('entityIds')->getData();
+
+            return $this->forward($context->getCrud()->getControllerFqcn().'::'.$crudAction, [
+                'ids' => $entityIds,
+                'context' => $context
+            ]);
+
+        }
+
+        if (null !== $referrer = $context->getReferrer()) {
+            return $this->redirect($referrer);
+        }
+
+        return $this->redirect($this->get(CrudUrlGenerator::class)->build()->setAction('index')->generateUrl());
     }
 
     public function index(AdminContext $context)
@@ -122,7 +143,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
 
         $entities = $this->get(EntityFactory::class)->createCollection($context->getEntity(), $paginator->getResults());
         $this->get(EntityFactory::class)->processFieldsForAll($entities, $fields);
-        $globalActions = $this->get(EntityFactory::class)->processActionsForAll($entities, $context->getCrud()->getActionsConfig());
+        $globalActions = $this->get(EntityFactory::class)->processActionsForAll($entities, $context->getCrud()->getActionsConfig())->getGlobalActions();
 
         $responseParameters = $this->configureResponseParameters(KeyValueStore::new([
             'pageName' => Crud::PAGE_INDEX,
@@ -131,7 +152,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
             'paginator' => $paginator,
             'global_actions' => $globalActions,
             'filters' => $filters,
-            // 'batch_form' => $this->createBatchActionsForm(),
+            'batch_form' => $this->get(FormFactory::class)->createBatchActionsForm()->createView(),
         ]));
 
         $event = new AfterCrudActionEvent($context, $responseParameters);
@@ -213,8 +234,8 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         $editForm = $this->createEditForm($context->getEntity(), $context->getCrud()->getEditFormOptions(), $context);
         $editForm->handleRequest($context->getRequest());
         if ($editForm->isSubmitted() && $editForm->isValid()) {
-            // TODO:
-            // $this->processUploadedFiles($editForm);
+
+            $this->processUploadedFiles($editForm);
 
             $event = new BeforeEntityUpdatedEvent($entityInstance);
             $this->get('event_dispatcher')->dispatch($event);
@@ -235,9 +256,8 @@ abstract class AbstractCrudController extends AbstractController implements Crud
             }
 
             if (Action::SAVE_AND_RETURN === $submitButtonName) {
-                $url = empty($context->getReferrer())
-                    ? $this->get(CrudUrlGenerator::class)->build()->setAction(Action::INDEX)->generateUrl()
-                    : $context->getReferrer();
+                $url = $context->getReferrer()
+                    ?? $this->get(CrudUrlGenerator::class)->build()->setAction(Action::INDEX)->generateUrl();
 
                 return $this->redirect($url);
             }
@@ -280,16 +300,13 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         $context->getEntity()->setInstance($this->createEntity($context->getEntity()->getFqcn()));
         $this->get(EntityFactory::class)->processFields($context->getEntity(), FieldCollection::new($this->configureFields(Crud::PAGE_NEW)));
         $this->get(EntityFactory::class)->processActions($context->getEntity(), $context->getCrud()->getActionsConfig());
+        $entityInstance = $context->getEntity()->getInstance();
 
         $newForm = $this->createNewForm($context->getEntity(), $context->getCrud()->getNewFormOptions(), $context);
         $newForm->handleRequest($context->getRequest());
-
-        $entityInstance = $newForm->getData();
-        $context->getEntity()->setInstance($entityInstance);
-
         if ($newForm->isSubmitted() && $newForm->isValid()) {
-            // TODO:
-            // $this->processUploadedFiles($newForm);
+
+            $this->processUploadedFiles($newForm);
 
             $event = new BeforeEntityPersistedEvent($entityInstance);
             $this->get('event_dispatcher')->dispatch($event);
@@ -397,20 +414,6 @@ abstract class AbstractCrudController extends AbstractController implements Crud
     public function autocomplete(AdminContext $context): JsonResponse
     {
         $queryBuilder = $this->createIndexQueryBuilder($context->getSearch(), $context->getEntity(), FieldCollection::new([]), FilterCollection::new());
-
-        $autocompleteContext = $context->getRequest()->get(AssociationField::PARAM_AUTOCOMPLETE_CONTEXT);
-
-        /** @var CrudControllerInterface $controller */
-        $controller = $this->get(ControllerFactory::class)->getCrudControllerInstance($autocompleteContext['crudId'], Action::INDEX, $context->getRequest());
-        /** @var FieldDto $field */
-        $field = FieldCollection::new($controller->configureFields($autocompleteContext['originatingPage']))->get($autocompleteContext['propertyName']);
-        /** @var \Closure|null $queryBuilderCallable */
-        $queryBuilderCallable = $field->getCustomOption(AssociationField::OPTION_QUERY_BUILDER_CALLABLE);
-
-        if (null !== $queryBuilderCallable) {
-            $queryBuilderCallable($queryBuilder);
-        }
-
         $paginator = $this->get(PaginatorFactory::class)->create($queryBuilder);
 
         return JsonResponse::fromJsonString($paginator->getResultsAsJson());
@@ -526,4 +529,49 @@ abstract class AbstractCrudController extends AbstractController implements Crud
 
         return $event;
     }
+
+    /**
+     * Process all uploaded files in the current form if available.
+     */
+    protected function processUploadedFiles(FormInterface $form): void
+    {
+        /** @var FormInterface $child */
+        foreach ($form as $child) {
+            $config = $child->getConfig();
+
+            if (!$config->getType()->getInnerType() instanceof FileUploadType) {
+                if ($config->getCompound()) {
+                    $this->processUploadedFiles($child);
+                }
+
+                continue;
+            }
+
+            /** @var FileUploadState $state */
+            $state = $config->getAttribute('state');
+
+            if (!$state->isModified()) {
+                continue;
+            }
+
+            $uploadDelete = $config->getOption('upload_delete');
+
+            if ($state->hasCurrentFiles() && ($state->isDelete() || (!$state->isAddAllowed() && $state->hasUploadedFiles()))) {
+                foreach ($state->getCurrentFiles() as $file) {
+                    $uploadDelete($file);
+                }
+                $state->setCurrentFiles([]);
+            }
+
+            $filePaths = (array) $child->getData();
+            $uploadDir = $config->getOption('upload_dir');
+            $uploadNew = $config->getOption('upload_new');
+
+            foreach ($state->getUploadedFiles() as $index => $file) {
+                $fileName = mb_substr($filePaths[$index], mb_strlen($uploadDir));
+                $uploadNew($file, $uploadDir, $fileName);
+            }
+        }
+    }
+
 }
