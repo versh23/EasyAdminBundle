@@ -3,6 +3,7 @@
 namespace EasyCorp\Bundle\EasyAdminBundle\Field;
 
 use EasyCorp\Bundle\EasyAdminBundle\Contracts\Field\FieldInterface;
+use EasyCorp\Bundle\EasyAdminBundle\Form\Type\FileUploadType;
 use Symfony\Component\Form\Extension\Core\Type\FileType;
 
 abstract class AbstractFileField implements FieldInterface
@@ -16,7 +17,7 @@ abstract class AbstractFileField implements FieldInterface
         return (new static())
             ->setProperty($propertyName)
             ->setLabel($label)
-            ->setFormType(FileType::class)
+            ->setFormType(FileUploadType::class)
             ->setTextAlign('center')
             ->setCustomOption(self::OPTION_BASE_PATH, null);
     }
@@ -24,6 +25,7 @@ abstract class AbstractFileField implements FieldInterface
     public function setBasePath(string $path): self
     {
         $this->setCustomOption(self::OPTION_BASE_PATH, $path);
+        $this->setFormTypeOption('upload_dir', $path);
 
         return $this;
     }
