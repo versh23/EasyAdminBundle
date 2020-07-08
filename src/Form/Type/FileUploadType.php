@@ -214,7 +214,7 @@ class FileUploadType extends AbstractType implements DataMapperInterface
      */
     public function getBlockPrefix(): string
     {
-        return 'easyadmin_fileupload';
+        return 'ea_fileupload';
     }
 
     /**
