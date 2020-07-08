@@ -310,6 +310,7 @@ return static function (ContainerConfigurator $container) {
         ->set(IdConfigurator::class)
 
         ->set(FileConfigurator::class)
+            ->arg(0, '%kernel.project_dir%')
 
         ->set(LanguageConfigurator::class)
 

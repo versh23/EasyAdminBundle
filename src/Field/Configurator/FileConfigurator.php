@@ -15,6 +15,13 @@ use EasyCorp\Bundle\EasyAdminBundle\Field\ImageField;
  */
 final class FileConfigurator implements FieldConfiguratorInterface
 {
+    private $projectDir;
+
+    public function __construct(string $projectDir)
+    {
+        $this->projectDir = $projectDir;
+    }
+
     public function supports(FieldDto $field, EntityDto $entityDto): bool
     {
         return \in_array($field->getFieldFqcn(), [
@@ -25,10 +32,15 @@ final class FileConfigurator implements FieldConfiguratorInterface
 
     public function configure(FieldDto $field, EntityDto $entityDto, AdminContext $context): void
     {
+        $value = $field->getValue();
         $configuredBasePath = $field->getCustomOption(AbstractFileField::OPTION_BASE_PATH);
-        $formattedValue = $this->getFilePath($field->getValue(), $configuredBasePath);
+        $formattedValue = $this->getFilePath($value, $configuredBasePath);
 
         $field->setFormattedValue($formattedValue);
+
+        if ($value && is_file($value)) {
+            $field->setValue(basename($value));
+        }
 
         // this check is needed to avoid displaying broken images when image properties are optional
         if (empty($formattedValue) || $formattedValue === rtrim($configuredBasePath ?? '', '/')) {
@@ -42,6 +54,9 @@ final class FileConfigurator implements FieldConfiguratorInterface
         if (null === $filePath || 0 !== preg_match('/^(http[s]?|\/\/)/i', $filePath)) {
             return $filePath;
         }
+
+        //erase project path from filepath
+        $filePath = str_replace($this->projectDir.'/public/', '', $filePath);
 
         return isset($basePath)
             ? rtrim($basePath, '/').'/'.ltrim($filePath, '/')

@@ -25,7 +25,6 @@ abstract class AbstractFileField implements FieldInterface
     public function setBasePath(string $path): self
     {
         $this->setCustomOption(self::OPTION_BASE_PATH, $path);
-        $this->setFormTypeOption('upload_dir', $path);
 
         return $this;
     }
