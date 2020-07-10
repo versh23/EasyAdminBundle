@@ -234,7 +234,6 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         $editForm = $this->createEditForm($context->getEntity(), $context->getCrud()->getEditFormOptions(), $context);
         $editForm->handleRequest($context->getRequest());
         if ($editForm->isSubmitted() && $editForm->isValid()) {
-
             $this->processUploadedFiles($editForm);
 
             $event = new BeforeEntityUpdatedEvent($entityInstance);
@@ -305,7 +304,6 @@ abstract class AbstractCrudController extends AbstractController implements Crud
         $newForm = $this->createNewForm($context->getEntity(), $context->getCrud()->getNewFormOptions(), $context);
         $newForm->handleRequest($context->getRequest());
         if ($newForm->isSubmitted() && $newForm->isValid()) {
-
             $this->processUploadedFiles($newForm);
 
             $event = new BeforeEntityPersistedEvent($entityInstance);
@@ -573,5 +571,4 @@ abstract class AbstractCrudController extends AbstractController implements Crud
             }
         }
     }
-
 }

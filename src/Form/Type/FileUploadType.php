@@ -178,7 +178,6 @@ class FileUploadType extends AbstractType implements DataMapperInterface
             }
 
             return static function (UploadedFile $file) use ($value) {
-
                 return strtr($value, [
                     '[contenthash]' => sha1_file($file->getRealPath()),
                     '[day]' => date('d'),
