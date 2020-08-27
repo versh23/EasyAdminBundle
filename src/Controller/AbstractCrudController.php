@@ -110,6 +110,7 @@ abstract class AbstractCrudController extends AbstractController implements Crud
 
             return $this->forward($context->getCrud()->getControllerFqcn().'::'.$crudAction, [
                 'ids' => $entityIds,
+                'context' => $context
             ]);
 
         }
