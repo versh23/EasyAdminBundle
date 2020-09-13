@@ -330,74 +330,80 @@ The following example shows all kinds of actions in practice::
 Batch Actions
 -------------
 
-.. note::
+Batch actions are a special kind of action which is applied to multiple items at
+the same time. They are only available in the ``index`` page.
 
-    Batch actions are not ready yet, but we're working on adding support for them.
+Imagine that you manage users with a ``User`` entity and a common task is to
+approve their sign ups. Instead of creating a normal ``approve`` action as
+explained in the previous sections, create a batch action to be more productive
+and approve multiple users at once.
 
-.. Batch actions are a special kind of action which is applied to multiple items at
-.. the same time. They are only available in the ``index`` page. The only built-in
-.. batch action is ``delete``. You can remove this action as follows::
-..
-..     ->removeBatchAction('delete');
-..
-.. You can change some of its options with the following method::
-..
-..     $batchDelete = Action::new('Delete', 'fa-trash')->cssClass('...')->method('batchDelete');
-..     // ...
-..     ->setBatchAction('delete', $batchDelete);
-..
-.. Custom Batch Actions
-.. ~~~~~~~~~~~~~~~~~~~~
-..
-.. Imagine that you manage users with a ``User`` entity and a common task is to
-.. approve their sign ups. Instead of creating a normal ``approve`` action as
-.. explained in the previous sections, create a batch action to be more productive
-.. and approve multiple users at once.
-..
-.. First, create a method in your resource admin to handle this batch action (the
-.. method will receive an array with the IDs of the selected entities)::
-..
-..     namespace App\Controller\Admin;
-..
-..     use EasyCorp\Bundle\EasyAdminBundle\Config\ResourceConfig;
-..     use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractResourceAdminController;
-..
-..     class UserAdminController extends AbstractResourceAdminController
-..     {
-..         // ...
-..
-..         public function approveUsers(array $ids)
-..         {
-..             $entityClass = $this->getConfig()->getEntityClass();
-..             $em = $this->getDoctrine()->getManagerForClass($entityClass);
-..
-..             foreach ($ids as $id) {
-..                 $user = $em->find($id);
-..                 $user->approve();
-..             }
-..
-..             $this->em->flush();
-..
-..             // don't return anything or redirect to any URL because it will be ignored
-..             // when a batch action finishes, user is redirected to the original page
-..         }
-..     }
-..
-.. Now use the ``addBatchAction()`` method to add it to your resource admin::
-..
-..     namespace App\Controller\Admin;
-..
-..     use EasyCorp\Bundle\EasyAdminBundle\Config\ResourceConfig;
-..     use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractResourceAdminController;
-..
-..     class UserAdminController extends AbstractResourceAdminController
-..     {
-..         // ...
-..
-..         public function getIndexPageConfig(): IndexPageConfig
-..         {
-..             return IndexPageConfig::new()
-..                 // ...
-..                 ->addBatchAction('approve', Action::new('Approve', 'fa-user-check')->method('approveUsers'));
-..         }
-..     }
+First, create a method in your resource admin to handle this batch action (the
+method will receive an array with the IDs of the selected entities)::
+
+     namespace App\Controller\Admin;
+
+     use EasyCorp\Bundle\EasyAdminBundle\Context\AdminContext;
+     use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
+
+     class UserCrudController extends AbstractCrudController
+     {
+         // ...
+
+         public function approveUsers(array $ids, AdminContext $context)
+         {
+             $entityClass = $context->getEntity()->getFqcn();
+
+             $em = $this->getDoctrine()->getManagerForClass($entityClass);
+
+             foreach ($ids as $id) {
+                 $user = $em->find($id);
+                 $user->approve();
+             }
+
+             $em->flush();
+
+         }
+     }
+
+
+Now add it to your actions configuration::
+
+     namespace App\Controller\Admin;
+
+     use EasyCorp\Bundle\EasyAdminBundle\Controller\AbstractCrudController;
+     use EasyCorp\Bundle\EasyAdminBundle\Config\Action;
+     use EasyCorp\Bundle\EasyAdminBundle\Config\Actions;
+
+     class UserCrudController extends AbstractCrudController
+     {
+         // ...
+
+        public function configureActions(Actions $actions): Actions {
+
+            // Button with text and icon
+            $actions->add(Crud::PAGE_INDEX, Action::new('Approve')
+                    ->createAsBatchAction()
+                    ->linkToCrudAction('approveUsers')
+                    ->addCssClass('btn btn-primary')
+                    ->setIcon('fa fa-user-check')
+            );
+
+           // Button without text
+           $actions->add(Crud::PAGE_INDEX, Action::new('Approve', false)
+                    ->createAsBatchAction()
+                    ->linkToCrudAction('approveUsers')
+                    ->addCssClass('btn btn-primary')
+                    ->setIcon('fa fa-user-check')
+
+                    // this text will be shown on modal window
+                    ->setHtmlAttributes(['title' => 'Approve'])
+
+            );
+
+            return $actions;
+         }
+     }
+
+
+
