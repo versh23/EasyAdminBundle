@@ -51,8 +51,10 @@ final class CommonPreConfigurator implements FieldConfiguratorInterface
         $isSortable = $this->buildSortableOption($field, $entityDto);
         $field->setSortable($isSortable);
 
-        $isVirtual = $this->buildVirtualOption($field, $entityDto);
-        $field->setVirtual($isVirtual);
+        if (null === $field->isVirtual()) {
+            $isVirtual = $this->buildVirtualOption($field, $entityDto);
+            $field->setVirtual($isVirtual);
+        }
 
         $templatePath = $this->buildTemplatePathOption($context, $field, $entityDto);
         $field->setTemplatePath($templatePath);
@@ -85,6 +87,12 @@ final class CommonPreConfigurator implements FieldConfiguratorInterface
     {
         $entityInstance = $entityDto->getInstance();
         $propertyName = $field->getProperty();
+
+        if (\is_callable($field->getValue())) {
+            $callable = $field->getValue();
+
+            return $callable($entityInstance);
+        }
 
         if (!$this->propertyAccessor->isReadable($entityInstance, $propertyName)) {
             return null;
@@ -157,7 +165,8 @@ final class CommonPreConfigurator implements FieldConfiguratorInterface
         }
 
         $isPropertyReadable = $this->propertyAccessor->isReadable($entityDto->getInstance(), $field->getProperty());
-        if (!$isPropertyReadable) {
+        $isVirtual = $field->isVirtual();
+        if (!$isPropertyReadable && !$isVirtual) {
             return $adminContext->getTemplatePath('label/inaccessible');
         }
 
